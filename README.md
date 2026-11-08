@@ -1,4 +1,3 @@
-```markdown
 # Explainable Machine Learning for Gallstone Disease
 
 A machine learning project designed to predict the presence of gallstone disease using clinical tabular data and provide interpretable insights into the underlying features driving the predictions.
