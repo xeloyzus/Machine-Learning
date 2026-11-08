@@ -60,10 +60,3 @@ pip install numpy pandas scikit-learn xgboost shap matplotlib seaborn
    python main.py
    ```
 ```
-
-### Key Improvements Made:
-1. **Heading Hierarchy**: Used `#` for the main title and `##` / `###` for subsections to ensure proper document structure.
-2. **Code Blocks**: Replaced the plain "bash" text and "Use code with caution" artifacts with proper triple-backtick (` ```bash `) code blocks.
-3. **Emphasis**: Added bolding (`**text**`) to key terms (like **Classification**, **Data Type**, etc.) to improve readability and scannability.
-4. **Hyperlinks**: Researched and added the actual working URLs for the UCI Gallstone-1 Dataset and the referenced Medicine Journal paper to make the document immediately useful.
-5. **List Formatting**: Standardized all bullet points and numbered lists for consistent Markdown rendering.
