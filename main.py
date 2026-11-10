@@ -1,407 +1,195 @@
-
-import pandas as pd
-import numpy as np
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 
-"""
-----------
-
-- This module provides functions to load and preprocess a dataset for machine learning tasks.
-- It includes functions to load the dataset from a specified source and preprocess it for further analysis.
-
-----------
-"""
 
 class DatasetLoader:
-    """A class to handle highly optimized loading and preprocessing of datasets."""
+    """Load and prepare the Gallstone dataset."""
 
     def __init__(self, source):
-        """Initialize the DatasetLoader with a specified data source.
-
-        Args:
-            source (str): The path or URL to the dataset.
-        """
         self.source = source
 
     def load(self):
-        """Load the dataset from the specified source instantly.
-
-        Returns:
-            data (list): A list containing the loaded dataset.
-        """
+        """Return the dataset as a pandas DataFrame."""
         print("Loading dataset from:", self.source)
         try:
-            # Low_memory=False ensures optimization for mixed types
-            df = pd.read_csv(self.source, low_memory=False)
-            print("Dataset loaded successfully. Number of rows:", len(df))
-            print("Columns in the dataset:", df.columns.tolist())
-            print(f"Initial Dataset Shape: {df.shape}")
-        except Exception as e:
-            print("Error loading dataset:", e)
-            return []
+            data = pd.read_csv(self.source, low_memory=False)
+        except (OSError, ValueError) as error:
+            print("Error loading dataset:", error)
+            return pd.DataFrame()
 
-        # Instantaneous conversion to dictionary list using C-optimized routines
-        return df.to_dict(orient="records")
+        print("Dataset shape:", data.shape)
+        return data
 
     def preprocess(self, data):
-        """Preprocess the dataset using vectorized operations instead of loops.
-
-        Args:
-            data (list): The raw dataset to be preprocessed.
-
-        Returns:
-            preprocessed_data (list): A list containing the preprocessed
-            dataset.
-        """
-        if not data:
-            return []
+        """Apply dataset-specific cleaning before model training."""
+        if data.empty:
+            return data
 
         print("Preprocessing dataset...")
-
-        # Convert back to DataFrame instantly to perform vectorized changes
-        df = pd.DataFrame(data)
-
-        # Vectorized lowercase operation over all string objects across the DataFrame
-        # This replaces the entire row-by-row nested dictionary loop structure
-        df = df.map(
-            lambda x: x.lower() if isinstance(x, str) and pd.notna(x) else x
+        processed = data.copy()
+        string_columns = processed.select_dtypes(include="object").columns
+        processed[string_columns] = processed[string_columns].apply(
+            lambda column: column.str.lower()
         )
-
-        # Export back to a list of dicts instantly
-        return df.to_dict(orient="records")
-
+        return processed
 
     def run(self):
-        """
-        Load and preprocess the dataset.
+        return self.preprocess(self.load())
 
-        Returns:
-            preprocessed_data (list): A list containing the preprocessed dataset.
-        """
-        data = self.load()
-        preprocessed_data = self.preprocess(data)
-        return preprocessed_data
+
+class DataVisualizer:
+    """Create exploratory and evaluation plots."""
+
+    def __init__(self, data):
+        self.data = data.copy() if isinstance(data, pd.DataFrame) else pd.DataFrame(data)
+
+    def plot_target_distribution(self, target="Gallstone Status"):
+        """Plot the number of records in each target class."""
+        if target not in self.data.columns:
+            raise ValueError(f"Target column not found: {target}")
+
+        counts = self.data[target].value_counts().sort_index()
+        figure, axis = plt.subplots()
+        axis.bar(counts.index.astype(str), counts.values)
+        axis.set_title(f"Distribution of {target}")
+        axis.set_xlabel(target)
+        axis.set_ylabel("Number of records")
+        figure.tight_layout()
+        return figure
+
+    def plot_feature_distribution(self, feature, bins=20):
+        """Plot a numeric histogram or categorical bar chart."""
+        if feature not in self.data.columns:
+            raise ValueError(f"Feature column not found: {feature}")
+
+        values = self.data[feature].dropna()
+        figure, axis = plt.subplots()
+        if pd.api.types.is_numeric_dtype(values):
+            axis.hist(values, bins=bins)
+            axis.set_ylabel("Number of records")
+        else:
+            counts = values.value_counts().head(20)
+            axis.bar(counts.index.astype(str), counts.values)
+            axis.set_ylabel("Number of records")
+            axis.tick_params(axis="x", rotation=45)
+
+        axis.set_title(f"Distribution of {feature}")
+        axis.set_xlabel(feature)
+        figure.tight_layout()
+        return figure
+
+    def plot_correlation_matrix(self):
+        """Plot correlations between numeric features."""
+        numeric_data = self.data.select_dtypes(include="number")
+        if numeric_data.empty:
+            raise ValueError("At least one numeric column is required.")
+
+        correlations = numeric_data.corr()
+        figure, axis = plt.subplots(figsize=(12, 10))
+        image = axis.imshow(correlations, cmap="coolwarm", vmin=-1, vmax=1)
+        figure.colorbar(image, ax=axis, label="Correlation")
+        labels = correlations.columns.tolist()
+        axis.set_xticks(range(len(labels)), labels=labels, rotation=90)
+        axis.set_yticks(range(len(labels)), labels=labels)
+        axis.set_title("Correlation Matrix")
+        figure.tight_layout()
+        return figure
+
+    def plot_confusion_matrix(self, actual, predicted):
+        """Plot a confusion matrix from actual and predicted labels."""
+        actual = np.asarray(actual)
+        predicted = np.asarray(predicted)
+        if actual.shape != predicted.shape or actual.size == 0:
+            raise ValueError("Actual and predicted values must be non-empty and aligned.")
+
+        labels = np.unique(np.concatenate((actual, predicted)))
+        matrix = np.zeros((len(labels), len(labels)), dtype=int)
+        for actual_label, predicted_label in zip(actual, predicted):
+            actual_index = np.where(labels == actual_label)[0][0]
+            predicted_index = np.where(labels == predicted_label)[0][0]
+            matrix[actual_index, predicted_index] += 1
+
+        figure, axis = plt.subplots()
+        image = axis.imshow(matrix, cmap="Blues")
+        figure.colorbar(image, ax=axis)
+        axis.set_xticks(range(len(labels)), labels=[str(label) for label in labels])
+        axis.set_yticks(range(len(labels)), labels=[str(label) for label in labels])
+        axis.set_xlabel("Predicted label")
+        axis.set_ylabel("Actual label")
+        axis.set_title("Confusion Matrix")
+        figure.tight_layout()
+        return figure
 
 
 class DataProcessor:
-    """
-    A class to handle additional data processing tasks.
-    """
+    """Prepare features and target values for the model."""
 
     def __init__(self, data):
-        """
-        Initialize the DataProcessor with the dataset.
-
-        Args:
-            data (list): The dataset to be processed.
-        """
         self.data = data
 
     def process(self):
-        """
-        Process the dataset for further analysis.
-
-        Returns:
-            processed_data (list): A list containing the processed dataset.
-        """
+        """Return the processed data as a DataFrame."""
         print("Processing dataset...")
-        # Placeholder for additional data processing logic
-        processed_data = []
-        # Implement the logic to process your dataset here
-        return processed_data
+        return self.data.copy() if isinstance(self.data, pd.DataFrame) else pd.DataFrame(self.data)
+
+    def split_features_and_target(self, target_column="Gallstone Status"):
+        """Separate predictors from the target column."""
+        if target_column not in self.data.columns:
+            raise ValueError(f"Target column not found: {target_column}")
+
+        features = self.data.drop(columns=[target_column])
+        target = self.data[target_column]
+        return features, target
 
 
-class SKLearnModelTrainer():
-    """
-    A class to handle model training tasks specifically for scikit-learn models.
-    """
+class XGBoostModelTrainer:
+    """Template for the project's XGBoost classification workflow."""
 
     def __init__(self, data):
-        """Initialize the trainer with processed data."""
         self.data = data
 
     def train(self):
-        """
-        Train a scikit-learn machine learning model using the dataset.
-
-        Returns:
-            model (object): The trained scikit-learn machine learning model.
-        """
-        print("Training scikit-learn machine learning model...")
-        # Placeholder for scikit-learn model training logic
-        model = None
-        # Implement the logic to train your scikit-learn machine learning model here
-        return model
+        """Create, split, and fit the XGBoost classifier."""
+        # TODO: split features and target.
+        # TODO: create a reproducible train/test split.
+        # TODO: create and fit an XGBClassifier.
+        raise NotImplementedError
 
     def evaluate(self, model):
-        """
-        Evaluate the trained scikit-learn machine learning model.
-
-        Args:
-            model (object): The trained scikit-learn machine learning model to be evaluated.
-
-        Returns:
-            evaluation_metrics (dict): A dictionary containing evaluation metrics.
-        """
-        print("Evaluating scikit-learn machine learning model...")
-        # Placeholder for scikit-learn model evaluation logic
-        evaluation_metrics = {}
-        # Implement the logic to evaluate your scikit-learn machine learning model here
-        return evaluation_metrics
+        """Calculate classification metrics on the held-out test data."""
+        # TODO: calculate accuracy, precision, recall, F1, and ROC-AUC.
+        raise NotImplementedError
 
     def predict(self, model, new_data):
-        """
-        Make predictions using the trained scikit-learn machine learning model on new data.
+        """Generate predictions for new patient records."""
+        # TODO: validate and transform new_data to the training feature format.
+        # TODO: return model predictions and probabilities.
+        raise NotImplementedError
 
-        Args:
-            model (object): The trained scikit-learn machine learning model to be used for predictions.
-            new_data (list): The new data on which predictions will be made.
-
-        Returns:
-            predictions (list): A list containing the predictions made by the model.
-        """
-        print("Making predictions with scikit-learn machine learning model...")
-        # Placeholder for scikit-learn prediction logic
-        predictions = []
-        # Implement the logic to make predictions using your scikit-learn machine learning model here
-        return predictions
-
-    def save_model(self, model, path):
-        """
-        Save the trained scikit-learn machine learning model to a specified path.
-
-        Args:
-            model (object): The trained scikit-learn machine learning model to be saved.
-            path (str): The path where the model will be saved.
-        """
-        # Placeholder for scikit-learn model saving logic
-        # Implement the logic to save your trained scikit-learn machine learning model here
-        return None
-
-    def load_model(self, path):
-        """
-        Load a trained scikit-learn machine learning model from a specified path.
-
-        Args:
-            path (str): The path from where the model will be loaded.
-
-        Returns:
-            model (object): The loaded scikit-learn machine learning model.
-        """
-        # Placeholder for scikit-learn model loading logic
-        # Implement the logic to load your trained scikit-learn machine learning model here
-        return None
-
-    def run_full_pipeline(self, new_data):
-        """
-        Run the full machine learning pipeline specifically for scikit-learn models: load, preprocess, train, evaluate, and predict.
-
-        Args:
-            new_data (list): The new data on which predictions will be made.
-
-        Returns:
-            tuple: Evaluation metrics and predictions.
-        """
-        model = self.train()
-        evaluation_metrics = self.evaluate(model)
-        predictions = self.predict(model, new_data)
-        return evaluation_metrics, predictions
-
-    def save_pipeline(self, model, path):
-        """
-        Save the entire scikit-learn machine learning pipeline, including the trained model, to a specified path.
-
-        Args:
-            model (object): The trained scikit-learn machine learning model to be saved.
-            path (str): The path where the pipeline will be saved.
-        """
-        # Placeholder for scikit-learn pipeline saving logic
-        # Implement the logic to save your entire scikit-learn machine learning pipeline here
-        return None
-
-    def load_pipeline(self, path):
-        """
-        Load the entire scikit-learn machine learning pipeline, including the trained model, from a specified path.
-
-        Args:
-            path (str): The path from where the pipeline will be loaded.
-
-        Returns:
-            model (object): The loaded scikit-learn machine learning model.
-        """
-        # Placeholder for scikit-learn pipeline loading logic
-        # Implement the logic to load your entire scikit-learn machine learning pipeline here
-        return None
+    def explain(self, model):
+        """Explain feature contributions with SHAP."""
+        # TODO: create a SHAP explainer and summarize feature contributions.
+        raise NotImplementedError
 
     def run(self):
-        """
-        Run the full machine learning pipeline for scikit-learn models: load, preprocess, train, evaluate, and predict.
-
-        Returns:
-            evaluation_metrics (dict): A dictionary containing evaluation metrics.
-        """
+        """Run training, evaluation, and explainability."""
         model = self.train()
-        return self.evaluate(model)
-
-
-class XGBoostModelTrainer():
-    """
-    A class to handle model training tasks specifically for XGBoost models.
-    """
-
-    def __init__(self, data):
-        """Initialize the trainer with processed data."""
-        self.data = data
-
-    def train(self):
-        """
-        Train an XGBoost machine learning model using the dataset.
-
-        Returns:
-            model (object): The trained XGBoost machine learning model.
-        """
-        print("Training XGBoost machine learning model...")
-        # Placeholder for XGBoost model training logic
-        model = None
-        # Implement the logic to train your XGBoost machine learning model here
-        return model
-
-    def evaluate(self, model):
-        """
-        Evaluate the trained XGBoost machine learning model.
-
-        Args:
-            model (object): The trained XGBoost machine learning model to be evaluated.
-
-        Returns:
-            evaluation_metrics (dict): A dictionary containing evaluation metrics.
-        """
-        print("Evaluating XGBoost machine learning model...")
-        # Placeholder for XGBoost model evaluation logic
-        evaluation_metrics = {}
-        # Implement the logic to evaluate your XGBoost machine learning model here
-        return evaluation_metrics
-
-    def predict(self, model, new_data):
-        """
-        Make predictions using the trained XGBoost machine learning model on new data.
-
-        Args:
-            model (object): The trained XGBoost machine learning model to be used for predictions.
-            new_data (list): The new data on which predictions will be made.
-
-        Returns:
-            predictions (list): A list containing the predictions made by the model.
-        """
-        print("Making predictions with XGBoost machine learning model...")
-        # Placeholder for XGBoost prediction logic
-        predictions = []
-        # Implement the logic to make predictions using your XGBoost machine learning model here
-        return predictions
-
-    def save_model(self, model, path):
-        """
-        Save the trained XGBoost machine learning model to a specified path.
-
-        Args:
-            model (object): The trained XGBoost machine learning model to be saved.
-            path (str): The path where the model will be saved.
-        """
-        # Placeholder for XGBoost model saving logic
-        # Implement the logic to save your trained XGBoost machine learning model here
-        return None
-
-    def load_model(self, path):
-        """
-        Load a trained XGBoost machine learning model from a specified path.
-
-        Args:
-            path (str): The path from where the model will be loaded.
-
-        Returns:
-            model (object): The loaded XGBoost machine learning model.
-        """
-        # Placeholder for XGBoost model loading logic
-        model = None
-        # Implement the logic to load your trained XGBoost machine learning model here
-        return model
-
-    def run(self):
-        """
-        Train and evaluate the XGBoost machine learning model.
-
-        Returns:
-            evaluation_metrics (dict): Evaluation results for the model.
-        """
-        model = self.train()
-        return self.evaluate(model)
-
-    def run_full_pipeline(self, new_data):
-        """
-        Run the full machine learning pipeline specifically for XGBoost models: load, preprocess, train, evaluate, and predict.
-
-        Args:
-            new_data (list): The new data on which predictions will be made.
-        Returns:
-            tuple: Evaluation metrics and predictions.
-        """
-        model = self.train()
-        evaluation_metrics = self.evaluate(model)
-        predictions = self.predict(model, new_data)
-        return evaluation_metrics, predictions
-
-    def save_pipeline(self, model, path):
-        """
-        Save the entire XGBoost machine learning pipeline, including the trained model, to a specified path.
-
-        Args:
-            model (object): The trained XGBoost machine learning model to be saved.
-            path (str): The path where the pipeline will be saved.
-        """
-        # Placeholder for XGBoost pipeline saving logic
-        # Implement the logic to save your entire XGBoost machine learning pipeline here
-        return None
-
-    def load_pipeline(self, path):
-        """
-        Load the entire XGBoost machine learning pipeline, including the trained model, from a specified path.
-
-        Args:
-            path (str): The path from where the pipeline will be loaded.
-            model (object): The loaded XGBoost machine learning model.
-        """
-        # Placeholder for XGBoost pipeline loading logic
-        # Implement the logic to load your entire XGBoost machine learning pipeline here
-        return None
+        metrics = self.evaluate(model)
+        explanations = self.explain(model)
+        return model, metrics, explanations
 
 
 def main():
-    """
-    Main function to execute the machine learning pipeline.
-    """
-    # Load and preprocess the dataset
     dataset_loader = DatasetLoader("data/dataset-uci/dataset-uci.csv")
-    preprocessed_data = dataset_loader.run()
+    data = dataset_loader.run()
+    processed_data = DataProcessor(data).process()
 
-    # Process the data
-    data_processor = DataProcessor(preprocessed_data)
-    processed_data = data_processor.process()
+    trainer = XGBoostModelTrainer(processed_data)
+    model, metrics, explanations = trainer.run()
+    print("Evaluation metrics:", metrics)
+    return model, explanations
 
-    # Train and evaluate the model
-    model_trainer = XGBoostModelTrainer(processed_data)
-    evaluation_metrics = model_trainer.run()
 
-    # Make predictions on new data (replace with actual new data)
-    new_data = []  # Placeholder for new data
-    model = model_trainer.train()  # Assuming we want to use the trained model for predictions
-    predictions = model_trainer.predict(model, new_data)
-
-    print("Evaluation Metrics:", evaluation_metrics)
-    print("Predictions:", predictions)
-
-    
 if __name__ == "__main__":
-    load_datasets = DatasetLoader("data/dataset-uci/dataset-uci.csv")
-
-    preprocessed_data = load_datasets.load()
-            
+    main()
