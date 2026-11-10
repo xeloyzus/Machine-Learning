@@ -59,3 +59,5 @@ pip install numpy pandas scikit-learn xgboost shap matplotlib seaborn
    ```bash
    python main.py
    ```
+3. Sources:
+   https://apxml.com/courses/getting-started-with-gradient-boosting-algorithms/chapter-4-advanced-gradient-boosting-xgboost/practice-training-xgboost-model
