@@ -6,7 +6,7 @@ A machine learning project designed to predict the presence of gallstone disease
 
 Gallstone disease is a common medical condition closely linked to demographic, metabolic, body-composition, and biochemical characteristics. While standard machine learning models can achieve high classification accuracy, they often function as "black boxes."
 
-This project addresses this limitation by focusing on **Explainable AI (XAI)**—not only predicting the disease but also uncovering *why* the model makes a particular prediction.
+This project addresses this limitation by focusing on not only predicting the disease but also uncovering *why* the model makes a particular prediction.
 
 ## Objectives
 
